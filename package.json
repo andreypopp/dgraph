@@ -1,6 +1,6 @@
 {
   "name": "dgraph",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Extract and transform dependency graphs",
   "main": "index.js",
   "scripts": {
@@ -40,6 +40,7 @@
     "tap": "~0.4.4",
     "JSONStream": "~0.7.1",
     "concat-stream": "~1.0.1",
-    "jshint": "~2.1.10"
+    "jshint": "~2.1.10",
+    "semver": "~2.1.0"
   }
 }

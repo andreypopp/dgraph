@@ -34,7 +34,7 @@ Even extraction of CommonJS dependencies implemented as a module transform:
 
     var detective = require('detective')
 
-    module.exports = function(mod, g) {
+    module.exports = function(mod, graph) {
       if (graph.opts.noParse && graph.opts.noParse.indexOf(mod.id) > -1) return
       var deps = detective(mod.source)
 

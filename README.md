@@ -38,6 +38,6 @@ Even extraction of CommonJS dependencies implemented as a module transform:
       if (graph.opts.noParse && graph.opts.noParse.indexOf(mod.id) > -1) return
       var deps = detective(mod.source)
 
-      return graph.resolveDeps(deps, mod)
+      return graph.resolveMany(deps, mod)
         .then(function(deps) { return {deps: deps} })
     }

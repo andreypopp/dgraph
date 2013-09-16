@@ -28,16 +28,10 @@ function Graph(mains, opts) {
   self.resolveImpl = resolveWith.bind(null, self.opts.resolve || browserResolve)
   self.resolved = {}
   self.seen = {}
-  self.entries = [].concat(mains).filter(Boolean).map(function(m) {
-    var mod = {entry: true}
-    if (typeof m.pipe === 'function') {
-      mod.id = path.join(self.basedir, rng(8).toString('hex') + '.js')
-      mod.sourcePromise = aggregate(m)
-    } else {
-      mod.id = path.resolve(m)
-    }
-    return mod
-  })
+  self.entries = []
+
+  if (mains)
+    mains.filter(Boolean).forEach(this.addEntry.bind(this))
 }
 
 Graph.prototype = {
@@ -67,13 +61,25 @@ Graph.prototype = {
     }
   },
 
-  resolveDeps: function(ids, parent) {
+  resolveMany: function(ids, parent) {
     var self = this
     var result = {},
         resolutions = q.all(ids.map(function(id) {
           return self.resolve(id, parent).then(function(r) {result[id] = r.id})
         }))
     return resolutions.then(function() { return result })
+  },
+
+  addEntry: function(m) {
+    var mod = {entry: true}
+    if (typeof m.pipe === 'function') {
+      mod.id = path.join(self.basedir, rng(8).toString('hex') + '.js')
+      mod.sourcePromise = aggregate(m)
+    } else {
+      mod.id = path.resolve(m)
+    }
+    this.entries.push(mod)
+    return this
   },
 
   toStream: function() {

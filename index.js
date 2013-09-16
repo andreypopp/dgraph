@@ -31,7 +31,7 @@ function Graph(mains, opts) {
   self.entries = []
 
   if (mains)
-    mains.filter(Boolean).forEach(this.addEntry.bind(this))
+    [].concat(mains).filter(Boolean).forEach(this.addEntry.bind(this))
 }
 
 Graph.prototype = {
@@ -73,7 +73,7 @@ Graph.prototype = {
   addEntry: function(m) {
     var mod = {entry: true}
     if (typeof m.pipe === 'function') {
-      mod.id = path.join(self.basedir, rng(8).toString('hex') + '.js')
+      mod.id = path.join(this.basedir, rng(8).toString('hex') + '.js')
       mod.sourcePromise = aggregate(m)
     } else {
       mod.id = path.resolve(m)

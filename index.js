@@ -98,21 +98,21 @@ Graph.prototype = {
     })
   },
 
-  walk: function(mod, parent) {
-    var self = this
-    if (utils.isString(mod)) mod = self.resolved[mod]
-    if (self.seen[mod.id]) return
-    self.seen[mod.id] = true
+  walk: function(modId, parent) {
+    var mod = utils.isString(modId) ? this.resolved[modId] : modId
 
-    var cached = self.checkCache(mod, parent)
+    if (this.seen[mod.id]) return
+    this.seen[mod.id] = true
+
+    var cached = this.checkCache(mod, parent)
     if (cached) {
-      self.emit(cached)
-      return self.walkDeps(cached, parent)
+      this.emit(cached)
+      return this.walkDeps(cached, parent)
     }
 
-    return self.applyTransforms(mod)
-      .then(self.emit.bind(self))
-      .then(self.walkDeps.bind(self))
+    return this.applyTransforms(mod)
+      .then(this.emit.bind(this))
+      .then(this.walkDeps.bind(this))
   },
 
   walkDeps: function(mod) {
@@ -123,18 +123,21 @@ Graph.prototype = {
   },
 
   emit: function(mod) {
-    var self = this,
-        result = utils.clone(mod)
+    // shallow copy first because deepClone break buffers
+    var shallow = utils.clone(mod)
 
-    delete result.package
-    delete result.sourcePromise
+    delete shallow.package
+    delete shallow.sourcePromise
 
-    if (!result.deps)
-      result.deps = {}
-    if (Buffer.isBuffer(result.source))
-      result.source = result.source.toString()
+    if (!shallow.deps)
+      shallow.deps = {}
+    if (Buffer.isBuffer(shallow.source))
+      shallow.source = shallow.source.toString()
 
-    self.output.queue(result)
+    // now after we mangled shallow copy we can do a deep one
+    var result = utils.cloneDeep(shallow);
+
+    this.output.queue(result);
     return mod
   },
 

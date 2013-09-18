@@ -193,6 +193,15 @@ Graph.prototype = {
       if (pkg && typeof pkg === 'object') pkg = pkg[k]
     })
     return [].concat(pkg).filter(Boolean)
+  },
+
+  noParse: function(id) {
+    if (!this.opts.noParse)
+      return false
+    else if (Array.isArray(this.opts.noParse))
+      return this.opts.noParse.indexOf(id) > -1
+    else
+      return this.opts.noParse(id)
   }
 }
 

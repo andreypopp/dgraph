@@ -2,11 +2,11 @@
 
 var detective = require('detective')
 
-module.exports = function(mod, g) {
-  if (g.opts.noParse && g.opts.noParse.indexOf(mod.id) > -1) return
+module.exports = function(mod, graph) {
+  if (graph.noParse(mod.id)) return
   var deps = detective(mod.source)
 
-  return g.resolveMany(deps, mod)
+  return graph.resolveMany(deps, mod)
     .then(function(deps) { return {deps: deps} })
 }
 

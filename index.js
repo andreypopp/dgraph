@@ -26,8 +26,7 @@ function Graph(mains, opts) {
   process.nextTick(this.output.resume.bind(this.output))
   this.basedir = this.opts.basedir || process.cwd()
   this.resolveImpl = resolveWith.bind(null, this.opts.resolve || browserResolve)
-  this.cache = this.opts.cache;
-  this.resolved = {}
+  this.cache = this.opts.cache || {};
   this.seen = {}
   this.entries = []
 
@@ -51,7 +50,7 @@ Graph.prototype = {
       }
       return this.resolveImpl(id, relativeTo)
         .then(function(mod) {
-          this.resolved[mod.id] = mod
+          this.cache[mod.id] = mod
           return mod
         }.bind(this))
         .fail(function(err) {
@@ -95,14 +94,14 @@ Graph.prototype = {
     if (this.seen[modID]) return
     this.seen[modID] = true
 
-    if (this.cache && this.cache[modID]) {
+    if (this.cache[modID])
+      mod = this.cache[modID]
+          
+    if (mod.source) {
       var cached = this.cache[modID]
       this.report(cached)
       return this.walkDeps(cached, parent)
     }
-
-    if (utils.isString(mod))
-      mod = this.resolved[modID]
 
     return this.applyTransforms(mod)
       .then(this.report.bind(this))

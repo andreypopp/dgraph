@@ -2,7 +2,9 @@
 
 `dgraph` is a replacement for `module-deps` which:
 
-  * is fully compatible with `module-deps` (reuses its test suite)
+  * is almost fully compatible with `module-deps` for the expception of
+    different caching mechanism, otherwise it reuses test suite from
+    `module-deps`
   * allows you to extract dependencies and enrich modules via transforms
 
 ## installation

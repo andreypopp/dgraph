@@ -100,6 +100,9 @@ Graph.prototype = {
   walk: function(mod, parent) {
     var modID = mod.id || mod
 
+    if (this.seen[modID]) return
+    this.seen[modID] = true
+
     if (this.cache && this.cache[modID]) {
       var cached = this.cache[modID]
       this.report(cached)
@@ -117,30 +120,20 @@ Graph.prototype = {
   walkDeps: function(mod) {
     if (mod.deps && Object.keys(mod.deps).length > 0)
       return q.all(Object.keys(mod.deps)
-        .filter(function(id) {
-          return (mod.deps[id] && !this.seen[mod.deps[id]])
-        }.bind(this))
-        .map(function(id) {
-          this.seen[mod.deps[id]] = true
-          return this.walk(mod.deps[id], mod)
-        }.bind(this)))
+        .filter(function(id) { return mod.deps[id] })
+        .map(function(id) { return this.walk(mod.deps[id], mod) }.bind(this)))
   },
 
   report: function(mod) {
-    // shallow copy first because deepClone break buffers
-    var shallow = utils.clone(mod)
+    delete mod.sourcePromise
 
-    delete shallow.sourcePromise
+    if (!mod.deps)
+      mod.deps = {}
 
-    if (!shallow.deps)
-      shallow.deps = {}
-    if (Buffer.isBuffer(shallow.source))
-      shallow.source = shallow.source.toString()
+    if (Buffer.isBuffer(mod.source))
+      mod.source = mod.source.toString()
 
-    // now after we mangled shallow copy we can do a deep one
-    var result = utils.cloneDeep(shallow);
-
-    this.output.queue(result);
+    this.output.queue(utils.cloneDeep(mod))
     return mod
   },
 

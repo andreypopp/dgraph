@@ -117,9 +117,10 @@ Graph.prototype = {
 
   walkDeps: function(mod) {
     var self = this
-    return q.all(Object.keys(mod.deps)
-      .filter(function(id) { return mod.deps[id] })
-      .map(function(id) { return self.walk(mod.deps[id], mod) }))
+    if (mod.deps && Object.keys(mod.deps).length > 0)
+      return q.all(Object.keys(mod.deps)
+        .filter(function(id) { return mod.deps[id] })
+        .map(function(id) { return self.walk(mod.deps[id], mod) }))
   },
 
   emit: function(mod) {

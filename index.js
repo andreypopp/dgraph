@@ -2,6 +2,7 @@
 
 var fs                          = require('fs'),
     path                        = require('path'),
+    EventEmitter                = require('events').EventEmitter,
     rng                         = require('crypto').rng,
     q                           = require('kew'),
     through                     = require('through'),
@@ -14,59 +15,85 @@ var fs                          = require('fs'),
     jsonTransform               = require('./transforms/json')
 
 module.exports = function(mains, opts) {
-  return new Graph(mains, opts).toStream()
+  return new GraphResolution(mains, opts).toStream()
 }
 
 module.exports.Graph = Graph
+module.exports.GraphResolution = GraphResolution
 
 function Graph(mains, opts) {
-  var self = this
+  opts = opts || {};
+  this.mains = mains;
+  this.opts = opts;
+  this.cache = opts.cache;
+}
 
-  self.opts = opts || {}
-  self.output = through()
-  self.basedir = self.opts.basedir || process.cwd()
-  self.resolveImpl = resolveWith.bind(null, self.opts.resolve || browserResolve)
-  self.resolved = {}
-  self.seen = {}
-  self.entries = []
+Graph.prototype = {
+  resolutionStrategy: GraphResolution,
+
+  createResolution: function() {
+    var opts = utils.clone(this.opts)
+    opts.cache = this.cache
+    return new this.resolutionStrategy(this.mains, opts)
+  },
+
+  toStream: function() {
+    return this.createResolution().toStream()
+  },
+
+  toPromise: function() {
+    return this.createResolution().toPromise()
+  }
+}
+utils.assign(Graph.prototype, EventEmitter.prototype);
+
+function GraphResolution(mains, opts) {
+  this.opts = opts || {}
+  this.output = through()
+  this.output.pause()
+  process.nextTick(this.output.resume.bind(this.output))
+  this.basedir = this.opts.basedir || process.cwd()
+  this.resolveImpl = resolveWith.bind(null, this.opts.resolve || browserResolve)
+  this.cache = this.opts.cache;
+  this.resolved = {}
+  this.seen = {}
+  this.entries = []
 
   if (mains)
     [].concat(mains).filter(Boolean).forEach(this.addEntry.bind(this))
 }
 
-Graph.prototype = {
+GraphResolution.prototype = {
 
   resolve: function(id, parent) {
-    var self = this
-    if (self.opts.filter && !self.opts.filter(id)) {
+    if (this.opts.filter && !this.opts.filter(id)) {
       return q.resolve({id: false})
     } else {
       var relativeTo = {
-        packageFilter: self.opts.packageFilter,
-        extensions: self.opts.extensions,
-        modules: self.opts.modules,
+        packageFilter: this.opts.packageFilter,
+        extensions: this.opts.extensions,
+        modules: this.opts.modules,
         paths: [],
         filename: parent.id,
         package: parent.package
       }
-      return self.resolveImpl(id, relativeTo)
+      return this.resolveImpl(id, relativeTo)
         .then(function(mod) {
-          self.resolved[mod.id] = mod
+          this.resolved[mod.id] = mod
           return mod
-        })
+        }.bind(this))
         .fail(function(err) {
           err.message += [', module required from', parent.id].join(' ')
           throw err
-        })
+        }.bind(this))
     }
   },
 
   resolveMany: function(ids, parent) {
-    var self = this
     var result = {},
         resolutions = q.all(ids.map(function(id) {
-          return self.resolve(id, parent).then(function(r) {result[id] = r.id})
-        }))
+          return this.resolve(id, parent).then(function(r) {result[id] = r.id})
+        }.bind(this)))
     return resolutions.then(function() { return result })
   },
 
@@ -83,11 +110,11 @@ Graph.prototype = {
   },
 
   toStream: function() {
-    var self = this
-    q.all(self.entries.map(function(mod) {return self.walk(mod, {id: '/'})}))
-      .fail(self.output.emit.bind(self.output, 'error'))
-      .fin(self.output.queue.bind(self.output, null))
-    return self.output
+    q.all(this.entries
+      .map(function(mod) {return this.walk(mod, {id: '/'})}.bind(this)))
+      .fail(this.output.emit.bind(this.output, 'error'))
+      .fin(this.output.queue.bind(this.output, null))
+    return this.output
   },
 
   toPromise: function() {
@@ -98,34 +125,43 @@ Graph.prototype = {
     })
   },
 
-  walk: function(modId, parent) {
-    var mod = utils.isString(modId) ? this.resolved[modId] : modId
+  walk: function(mod, parent) {
+    var modID = mod.id || mod
 
-    if (this.seen[mod.id]) return
-    this.seen[mod.id] = true
-
-    var cached = this.checkCache(mod, parent)
-    if (cached) {
-      this.emit(cached)
+    if (this.cache && this.cache[modID]) {
+      var cached = this.cache[modID]
+      this.report(cached)
       return this.walkDeps(cached, parent)
     }
 
+    if (utils.isString(mod))
+      mod = this.resolved[modID]
+
     return this.applyTransforms(mod)
-      .then(this.emit.bind(this))
+      .then(this.report.bind(this))
       .then(this.walkDeps.bind(this))
   },
 
   walkDeps: function(mod) {
-    var self = this
     if (mod.deps && Object.keys(mod.deps).length > 0)
       return q.all(Object.keys(mod.deps)
-        .filter(function(id) { return mod.deps[id] })
-        .map(function(id) { return self.walk(mod.deps[id], mod) }))
+        .filter(function(id) {
+          return (mod.deps[id] && !this.seen[mod.deps[id]])
+        }.bind(this))
+        .map(function(id) {
+          this.seen[mod.deps[id]] = true
+          return this.walk(mod.deps[id], mod)
+        }.bind(this)))
   },
 
-  emit: function(mod) {
+  report: function(mod) {
+    if (this.cache)
+      this.cache[mod.id] = mod
+
     // shallow copy first because deepClone break buffers
     var shallow = utils.clone(mod)
+
+    this.emit('module', mod);
 
     delete shallow.package
     delete shallow.sourcePromise
@@ -142,13 +178,6 @@ Graph.prototype = {
     return mod
   },
 
-  checkCache: function(mod, parent) {
-    var self = this
-    if (!(self.opts.cache && self.opts.cache[parent.id])) return
-    var id = self.opts.cache[parent.id].deps[mod.id]
-    return self.opts.cache[id]
-  },
-
   readSource: function(mod) {
     if (mod.source) return q.resolve(mod)
     var promise = mod.sourcePromise || aggregate(fs.createReadStream(mod.id))
@@ -159,34 +188,33 @@ Graph.prototype = {
   },
 
   applyTransforms: function(mod) {
-    var self = this,
-        transforms = [],
-        isTopLevel = self.entries.some(function (entry) {
+    var transforms = [],
+        isTopLevel = this.entries.some(function (entry) {
       return path.relative(path.dirname(entry.id), mod.id)
         .split('/').indexOf('node_modules') < 0
     })
 
     if (isTopLevel)
-      transforms = transforms.concat(self.opts.transform)
+      transforms = transforms.concat(this.opts.transform)
 
-    if (mod.package && self.opts.transformKey)
-      transforms = transforms.concat(self.getPackageTransform(mod.package))
+    if (mod.package && this.opts.transformKey)
+      transforms = transforms.concat(this.getPackageTransform(mod.package))
 
     transforms = transforms
       .filter(Boolean)
       .map(loadTransform.bind(null, mod))
       .concat(depsTransform, jsonTransform)
 
-    mod = self.readSource(mod)
+    mod = this.readSource(mod)
     return q.all(transforms).then(function(transforms) {
       transforms.forEach(function(t) {
         mod = mod.then(function(mod) {
           return (t.length === 1) ?
-            runStreamingTransform(t, mod) : runTransform(t, mod, self)
-        })
-      })
+            runStreamingTransform(t, mod) : runTransform(t, mod, this)
+        }.bind(this))
+      }.bind(this))
       return mod
-    })
+    }.bind(this))
   },
 
   getPackageTransform: function(pkg) {
@@ -266,3 +294,5 @@ function loadTransform(mod, transform) {
       throw err
     })
 }
+
+utils.assign(GraphResolution.prototype, EventEmitter.prototype);

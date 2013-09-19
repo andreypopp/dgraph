@@ -37,27 +37,27 @@ function Graph(mains, opts) {
 Graph.prototype = {
 
   resolve: function(id, parent) {
-    if (this.opts.filter && !this.opts.filter(id)) {
+    if (this.opts.filter && !this.opts.filter(id))
       return q.resolve({id: false})
-    } else {
-      var relativeTo = {
-        packageFilter: this.opts.packageFilter,
-        extensions: this.opts.extensions,
-        modules: this.opts.modules,
-        paths: [],
-        filename: parent.id,
-        package: parent.package
-      }
-      return this.resolveImpl(id, relativeTo)
-        .then(function(mod) {
-          this.cache[mod.id] = mod
-          return mod
-        }.bind(this))
-        .fail(function(err) {
-          err.message += [', module required from', parent.id].join(' ')
-          throw err
-        }.bind(this))
+
+    var relativeTo = {
+      packageFilter: this.opts.packageFilter,
+      extensions: this.opts.extensions,
+      modules: this.opts.modules,
+      paths: [],
+      filename: parent.id,
+      package: parent.package
     }
+
+    return this.resolveImpl(id, relativeTo)
+      .then(function(mod) {
+        this.cache[mod.id] = utils.assign(this.cache[mod.id] || {}, mod)
+        return this.cache[mod.id]
+      }.bind(this))
+      .fail(function(err) {
+        err.message += [', module required from', parent.id].join(' ')
+        throw err
+      }.bind(this))
   },
 
   resolveMany: function(ids, parent) {
@@ -96,7 +96,7 @@ Graph.prototype = {
 
     if (this.cache[modID])
       mod = this.cache[modID]
-          
+
     if (mod.source) {
       var cached = this.cache[modID]
       this.report(cached)

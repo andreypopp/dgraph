@@ -15,39 +15,12 @@ var fs                          = require('fs'),
     jsonTransform               = require('./transforms/json')
 
 module.exports = function(mains, opts) {
-  return new GraphResolution(mains, opts).toStream()
+  return new Graph(mains, opts).toStream()
 }
 
 module.exports.Graph = Graph
-module.exports.GraphResolution = GraphResolution
 
 function Graph(mains, opts) {
-  opts = opts || {};
-  this.mains = mains;
-  this.opts = opts;
-  this.cache = opts.cache;
-}
-
-Graph.prototype = {
-  resolutionStrategy: GraphResolution,
-
-  createResolution: function() {
-    var opts = utils.clone(this.opts)
-    opts.cache = this.cache
-    return new this.resolutionStrategy(this.mains, opts)
-  },
-
-  toStream: function() {
-    return this.createResolution().toStream()
-  },
-
-  toPromise: function() {
-    return this.createResolution().toPromise()
-  }
-}
-utils.assign(Graph.prototype, EventEmitter.prototype);
-
-function GraphResolution(mains, opts) {
   this.opts = opts || {}
   this.output = through()
   this.output.pause()
@@ -63,7 +36,7 @@ function GraphResolution(mains, opts) {
     [].concat(mains).filter(Boolean).forEach(this.addEntry.bind(this))
 }
 
-GraphResolution.prototype = {
+Graph.prototype = {
 
   resolve: function(id, parent) {
     if (this.opts.filter && !this.opts.filter(id)) {
@@ -158,10 +131,10 @@ GraphResolution.prototype = {
     if (this.cache)
       this.cache[mod.id] = mod
 
+    this.emit('module', mod);
+
     // shallow copy first because deepClone break buffers
     var shallow = utils.clone(mod)
-
-    this.emit('module', mod);
 
     delete shallow.package
     delete shallow.sourcePromise
@@ -295,4 +268,4 @@ function loadTransform(mod, transform) {
     })
 }
 
-utils.assign(GraphResolution.prototype, EventEmitter.prototype);
+utils.assign(Graph.prototype, EventEmitter.prototype);

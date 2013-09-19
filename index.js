@@ -89,14 +89,6 @@ Graph.prototype = {
     return this.output
   },
 
-  toPromise: function() {
-    return aggregate(this.toStream()).then(function(nodes) {
-      var graph = {}
-      nodes.forEach(function(mod) { graph[mod.id] = mod })
-      return graph
-    })
-  },
-
   walk: function(mod, parent) {
     var modID = mod.id || mod
 

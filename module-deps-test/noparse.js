@@ -25,11 +25,13 @@ test('noParse', function (t) {
                 id: files.main,
                 source: sources.main,
                 entry: true,
+                package: undefined,
                 deps: { './foo': files.foo }
             },
             {
                 id: files.foo,
                 source: sources.foo,
+                package: undefined,
                 deps: {}
             }
         ]);

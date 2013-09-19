@@ -2,7 +2,6 @@
 
 var fs                          = require('fs'),
     path                        = require('path'),
-    EventEmitter                = require('events').EventEmitter,
     rng                         = require('crypto').rng,
     q                           = require('kew'),
     through                     = require('through'),
@@ -71,7 +70,7 @@ Graph.prototype = {
   },
 
   addEntry: function(m) {
-    var mod = {entry: true}
+    var mod = {entry: true, package: undefined}
     if (typeof m.pipe === 'function') {
       mod.id = path.join(this.basedir, rng(8).toString('hex') + '.js')
       mod.sourcePromise = aggregate(m)
@@ -128,15 +127,9 @@ Graph.prototype = {
   },
 
   report: function(mod) {
-    if (this.cache)
-      this.cache[mod.id] = mod
-
-    this.emit('module', mod);
-
     // shallow copy first because deepClone break buffers
     var shallow = utils.clone(mod)
 
-    delete shallow.package
     delete shallow.sourcePromise
 
     if (!shallow.deps)
@@ -267,5 +260,3 @@ function loadTransform(mod, transform) {
       throw err
     })
 }
-
-utils.assign(Graph.prototype, EventEmitter.prototype);

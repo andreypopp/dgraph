@@ -40,7 +40,7 @@
     "tap": "~0.4.4",
     "JSONStream": "~0.7.1",
     "concat-stream": "~1.0.1",
-    "jshint": "~2.1.10",
+    "jshint": "~2.1.11",
     "semver": "~2.1.0"
   }
 }

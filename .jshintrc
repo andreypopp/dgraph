@@ -1,8 +1,8 @@
 {
   "undef": true,
   "unused": "vars",
-  "asi": true,
   "expr": true,
+  "asi": true,
   "globalstrict": true,
   "globals": {
     "Buffer": false,

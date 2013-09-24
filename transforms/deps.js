@@ -5,8 +5,10 @@ var detective = require('detective')
 module.exports = function(mod, graph) {
   if (graph.noParse(mod.id)) return
 
+  var deps;
+
   try {
-    var deps = detective(mod.source)
+    deps = detective(mod.source)
   } catch(e) {
     return
   }

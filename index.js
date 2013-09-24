@@ -144,11 +144,11 @@ Graph.prototype = {
         .split('/').indexOf('node_modules') < 0
     })
 
-    if (isTopLevel)
-      transforms = transforms.concat(this.opts.transform)
-
     if (mod.package && this.opts.transformKey)
       transforms = transforms.concat(this.getPackageTransform(mod.package))
+
+    if (isTopLevel)
+      transforms = transforms.concat(this.opts.transform)
 
     transforms = transforms
       .filter(Boolean)

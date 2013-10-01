@@ -1,6 +1,6 @@
 {
   "name": "dgraph",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "description": "Extract and transform dependency graphs",
   "main": "index.js",
   "scripts": {

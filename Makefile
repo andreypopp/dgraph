@@ -8,8 +8,13 @@ install link:
 lint:
 	@$(BIN)/jshint  --verbose *.js transforms/*.js
 
-test:
+module-deps-test::
 	@$(BIN)/tap module-deps-test/*.js
+
+dgraph-test::
+	@$(BIN)/mocha -R spec test/*.js
+
+test: module-deps-test dgraph-test
 
 release-patch: test lint
 	@$(call release,patch)

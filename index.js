@@ -7,11 +7,13 @@ var fs                          = require('fs'),
     through                     = require('through'),
     nodeResolve                 = require('resolve'),
     browserResolve              = require('browser-resolve'),
+    transformResolve            = resolveWith.bind(null, nodeResolve),
     aggregate                   = require('stream-aggregate-promise'),
     asStream                    = require('as-stream'),
     utils                       = require('lodash'),
     depsTransform               = require('./transforms/deps'),
-    jsonTransform               = require('./transforms/json')
+    jsonTransform               = require('./transforms/json');
+
 
 module.exports = function(mains, opts) {
   return new Graph(mains, opts).toStream()
@@ -140,9 +142,9 @@ Graph.prototype = {
   applyTransforms: function(mod) {
     var transforms = [],
         isTopLevel = this.entries.some(function (entry) {
-      return path.relative(path.dirname(entry.id), mod.id)
-        .split('/').indexOf('node_modules') < 0
-    })
+          return path.relative(path.dirname(entry.id), mod.id)
+            .split('/').indexOf('node_modules') < 0
+        })
 
     if (mod.package && this.opts.transformKey)
       transforms = transforms.concat(this.getPackageTransform(mod.package))
@@ -155,16 +157,27 @@ Graph.prototype = {
       .map(loadTransform.bind(null, mod))
       .concat(depsTransform, jsonTransform)
 
-    mod = this.readSource(mod)
-    return q.all(transforms).then(function(transforms) {
-      transforms.forEach(function(t) {
-        mod = mod.then(function(mod) {
-          return (t.length === 1) ?
-            runStreamingTransform(t, mod) : runTransform(t, mod, this)
-        }.bind(this))
-      }.bind(this))
-      return mod
-    }.bind(this))
+    return q.all(transforms)
+      .then(this.runTransformPipeline.bind(this, this.readSource(mod)))
+  },
+
+  runTransformPipeline: function(mod, transforms) {
+    return transforms.reduce(function(mod, t) {
+      var run = (t.length === 1) ? this.runStreamingTransform : this.runTransform
+      return mod.then(run.bind(this, t))
+    }.bind(this), mod)
+  },
+
+  runStreamingTransform: function(transform, mod) {
+    return aggregate(asStream(mod.source).pipe(transform(mod.id)))
+      .then(function(source) {
+        mod.source = source
+        return mod
+      })
+  },
+
+  runTransform: function(transform, mod) {
+    return q.resolve(transform(mod, this)).then(mergeInto.bind(null, mod))
   },
 
   getPackageTransform: function(pkg) {
@@ -210,27 +223,11 @@ function resolveWith(resolve, id, parent) {
   return p
 }
 
-function runStreamingTransform(transform, mod) {
-  return aggregate(asStream(mod.source).pipe(transform(mod.id)))
-    .then(function(source) {
-      mod.source = source
-      return mod
-    })
-}
-
-function runTransform(transform, mod, graph) {
-  return q.resolve(transform(mod, graph)).then(mergeInto.bind(null, mod))
-}
-
-var transformResolve = resolveWith.bind(null, nodeResolve)
-
 function loadTransform(mod, transform) {
   if (!utils.isString(transform)) return q.resolve(transform)
 
   return transformResolve(transform, {basedir: path.dirname(mod.id)})
-    .fail(function() {
-      return transformResolve(transform, {basedir: process.cwd()})
-    })
+    .fail(transformResolve.bind(null, transform, {basedir: process.cwd()}))
     .then(function(res) {
       if (!res)
         throw new Error([
@@ -238,9 +235,5 @@ function loadTransform(mod, transform) {
           ' while transforming ', mod.id
         ].join(''))
       return require(res.id)
-    })
-    .fail(function(err) {
-      err.message += ' which is required as a transform'
-      throw err
     })
 }

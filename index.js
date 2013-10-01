@@ -15,28 +15,62 @@ var fs                          = require('fs'),
     jsonTransform               = require('./transforms/json');
 
 
-module.exports = function(mains, opts) {
-  return new Graph(mains, opts).toStream()
+module.exports = function(entries, opts) {
+  return new Graph(entries, opts).toStream()
 }
 
 module.exports.Graph = Graph
+module.exports.GraphResolution = GraphResolution
 
-function Graph(mains, opts) {
+function Graph(entries, opts) {
+  opts = opts || {}
+  opts.basedir = opts.basedir || process.cwd()
+
+  this.opts = opts
+  this.entries = []
+  this.cache = this.opts.cache = {}
+
+  if (entries)
+    [].concat(entries).filter(Boolean).forEach(this.addEntry.bind(this))
+}
+
+Graph.prototype = {
+
+  addEntry: function(m) {
+    var mod = {entry: true, package: undefined}
+    if (typeof m.pipe === 'function') {
+      mod.id = path.join(this.opts.basedir, rng(8).toString('hex') + '.js')
+      mod.sourcePromise = aggregate(m)
+    } else {
+      mod.id = path.resolve(m)
+    }
+    this.entries.push(mod.id)
+    this.cache[mod.id] = mod
+    return this
+  },
+
+  toStream: function() {
+    return (new GraphResolution(this.entries, this.opts)).toStream()
+  },
+
+  invalidateModule: function(id) {
+    if (this.cache[id]) this.cache[id] = {id: id}
+  }
+}
+
+function GraphResolution(entries, opts) {
   this.opts = opts || {}
   this.output = through()
   this.output.pause()
   process.nextTick(this.output.resume.bind(this.output))
   this.basedir = this.opts.basedir || process.cwd()
   this.resolveImpl = resolveWith.bind(null, this.opts.resolve || browserResolve)
-  this.cache = this.opts.cache || {};
+  this.cache = opts.cache || {}
   this.seen = {}
-  this.entries = []
-
-  if (mains)
-    [].concat(mains).filter(Boolean).forEach(this.addEntry.bind(this))
+  this.entries = entries
 }
 
-Graph.prototype = {
+GraphResolution.prototype = {
 
   resolve: function(id, parent) {
     if (this.opts.filter && !this.opts.filter(id))
@@ -70,18 +104,6 @@ Graph.prototype = {
     return resolutions.then(function() { return result })
   },
 
-  addEntry: function(m) {
-    var mod = {entry: true, package: undefined}
-    if (typeof m.pipe === 'function') {
-      mod.id = path.join(this.basedir, rng(8).toString('hex') + '.js')
-      mod.sourcePromise = aggregate(m)
-    } else {
-      mod.id = path.resolve(m)
-    }
-    this.entries.push(mod)
-    return this
-  },
-
   toStream: function() {
     q.all(this.entries
       .map(function(mod) {return this.walk(mod, {id: '/'})}.bind(this)))
@@ -92,7 +114,6 @@ Graph.prototype = {
 
   walk: function(mod, parent) {
     var modID = mod.id || mod
-
     if (this.seen[modID]) return
     this.seen[modID] = true
 
@@ -119,6 +140,7 @@ Graph.prototype = {
 
   report: function(mod) {
     delete mod.sourcePromise
+    this.cache[mod.id] = mod
 
     if (!mod.deps)
       mod.deps = {}

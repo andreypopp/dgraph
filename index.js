@@ -54,7 +54,11 @@ Graph.prototype = {
   },
 
   invalidateModule: function(id) {
-    if (this.cache[id]) this.cache[id] = {id: id}
+    if (this.cache[id])
+      this.cache[id] = {
+        id: id,
+        package: this.cache[id].package
+      };
   }
 }
 

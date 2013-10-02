@@ -41,10 +41,13 @@ Graph.prototype = {
     if (typeof m.pipe === 'function') {
       mod.id = path.join(this.opts.basedir, rng(8).toString('hex') + '.js')
       mod.sourcePromise = aggregate(m)
-    } else {
+    } else if (utils.isString(m)) {
       mod.id = path.resolve(m)
+    } else {
+      mod = m
+      mod.id = path.resolve(mod.id)
     }
-    this.entries.push(mod.id)
+    this.entries.push(mod)
     this.cache[mod.id] = mod
     return this
   },

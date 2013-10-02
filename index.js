@@ -95,7 +95,7 @@ GraphResolution.prototype = {
         return this.cache[mod.id]
       }.bind(this))
       .fail(function(err) {
-        err.message += [', module required from', parent.id].join(' ')
+        err.message += ' (while resolving module ' + id + ', required from ' + parent.id;
         throw err
       }.bind(this))
   },

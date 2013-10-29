@@ -187,11 +187,12 @@ GraphResolution.prototype = {
   },
 
   applyTransforms: function(mod) {
-    var transforms = [],
-        isTopLevel = this.entries.some(function (entry) {
-          return path.relative(path.dirname(entry.id), mod.id)
-            .split('/').indexOf('node_modules') < 0
-        })
+    var transforms = [].concat(this.opts.globalTransform)
+
+    var isTopLevel = this.entries.some(function (entry) {
+      return path.relative(path.dirname(entry.id), mod.id)
+        .split('/').indexOf('node_modules') < 0
+    })
 
     if (mod.package && this.opts.transformKey)
       transforms = transforms.concat(this.getPackageTransform(mod.package))

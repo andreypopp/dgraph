@@ -1,20 +1,8 @@
 var assert    = require('assert'),
-    path      = require('path'),
-    aggregate = require('stream-aggregate-promise'),
-    dgraph    = require('../index');
+    utils     = require('./utils');
 
-function fixture(filename) {
-  return path.join(__dirname, 'fixtures', filename);
-}
-
-function bundle(mains, opts) {
-  mains = [].concat(mains).map(fixture);
-  return aggregate(dgraph(mains, opts));
-}
-
-function assertCannotFindModule(err) {
-  assert.ok(err.message.match(/cannot find module/i));
-}
+var assertCannotFindModule = utils.assertCannotFindModule,
+    bundle = utils.bundle;
 
 var shouldRaise = new Error('should raise an error instead');
 

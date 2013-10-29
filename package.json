@@ -33,7 +33,8 @@
     "detective": "~2.2.0",
     "JSONStream": "~0.7.1",
     "minimist": "0.0.3",
-    "kew": "~0.2.2"
+    "kew": "~0.2.2",
+    "stream-combiner": "0.0.2"
   },
   "devDependencies": {
     "browser-pack": "~0.10.1",

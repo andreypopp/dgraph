@@ -1,6 +1,7 @@
 "use strict";
 
 var fs                          = require('fs'),
+    EventEmitter                = require('events').EventEmitter,
     path                        = require('path'),
     rng                         = require('crypto').rng,
     q                           = require('kew'),
@@ -9,6 +10,7 @@ var fs                          = require('fs'),
     browserResolve              = require('browser-resolve'),
     transformResolve            = resolveWith.bind(null, nodeResolve),
     aggregate                   = require('stream-aggregate-promise'),
+    combine                     = require('stream-combiner'),
     asStream                    = require('as-stream'),
     utils                       = require('lodash'),
     depsTransform               = require('./transforms/deps'),
@@ -34,7 +36,7 @@ function Graph(entries, opts) {
     [].concat(entries).filter(Boolean).forEach(this.addEntry.bind(this))
 }
 
-Graph.prototype = {
+Graph.prototype = utils.assign(Graph.prototype, EventEmitter.prototype, {
 
   addEntry: function(m) {
     var mod = {entry: true, package: undefined}
@@ -53,7 +55,23 @@ Graph.prototype = {
   },
 
   toStream: function() {
-    return (new GraphResolution(this.entries, this.opts)).toStream()
+    var resolution = new GraphResolution(this.entries, this.opts);
+    var modules = resolution.toStream();
+    var interceptor = through(function(mod) {
+      this.emit('module', mod);
+      interceptor.queue(mod);
+    }.bind(this));
+    return combine(modules, interceptor);
+  },
+
+  toPromise: function() {
+    return aggregate(this.toStream()).then(function(mods) {
+      var graph = {};
+      for (var i = 0, length = mods.length; i < length; i++)
+        graph[mods[i].id] = mods[i];
+      return graph;
+    });
+
   },
 
   invalidateModule: function(id) {
@@ -63,7 +81,7 @@ Graph.prototype = {
         package: this.cache[id].package
       };
   }
-}
+});
 
 function GraphResolution(entries, opts) {
   this.opts = opts || {}

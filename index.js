@@ -103,7 +103,7 @@ GraphResolution.prototype = {
 
     var relativeTo = {
       packageFilter: this.opts.packageFilter,
-      extensions: this.opts.extensions,
+      extensions: ['.js'].concat(parent.extensions).concat(this.opts.extensions),
       modules: this.opts.modules,
       paths: [],
       filename: parent.id,

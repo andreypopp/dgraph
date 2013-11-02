@@ -1,6 +1,8 @@
 "use strict";
 
+var regexp = /\.json$/;
+
 module.exports = function(mod, opts) {
-  if (!/.*\.json/.exec(mod.filename)) return
+  if (!regexp.exec(mod.filename)) return
   return {source: 'module.exports = ' +  mod.source}
 }

@@ -89,6 +89,7 @@ function GraphResolution(entries, opts) {
   this.output.pause()
   process.nextTick(this.output.resume.bind(this.output))
   this.basedir = this.opts.basedir || process.cwd()
+  this.extensions = ['.js'].concat(this.opts.extensions).filter(Boolean)
   this.resolveImpl = resolveWith.bind(null, this.opts.resolve || browserResolve)
   this.cache = opts.cache || {}
   this.seen = {}
@@ -103,7 +104,7 @@ GraphResolution.prototype = {
 
     var relativeTo = {
       packageFilter: this.opts.packageFilter,
-      extensions: ['.js'].concat(parent.extensions).concat(this.opts.extensions),
+      extensions: parent.extensions ? parent.extensions : this.extensions,
       modules: this.opts.modules,
       paths: [],
       filename: parent.id,
@@ -173,7 +174,10 @@ GraphResolution.prototype = {
     if (Buffer.isBuffer(mod.source))
       mod.source = mod.source.toString()
 
-    this.output.queue(utils.cloneDeep(mod))
+    mod = utils.clone(mod);
+    mod.deps = utils.clone(mod.deps);
+
+    this.output.queue(mod);
     return mod
   },
 
@@ -202,11 +206,17 @@ GraphResolution.prototype = {
 
     transforms = transforms
       .filter(Boolean)
-      .map(loadTransform.bind(null, mod))
-      .concat(depsTransform, jsonTransform)
+      .map(this.loadTransform.bind(this, mod))
+      .concat(depsTransform)
 
-    return q.all(transforms)
-      .then(this.runTransformPipeline.bind(this, this.readSource(mod)))
+    if (/\.json$/.exec(mod.id))
+      transforms.push(jsonTransform)
+
+    if (transforms.length > 0)
+      return q.all(transforms)
+        .then(this.runTransformPipeline.bind(this, this.readSource(mod)))
+    else
+      return mod;
   },
 
   runTransformPipeline: function(mod, transforms) {
@@ -226,6 +236,21 @@ GraphResolution.prototype = {
 
   runTransform: function(transform, mod) {
     return q.resolve(transform(mod, this)).then(mergeInto.bind(null, mod))
+  },
+
+  loadTransform: function(mod, transform) {
+    if (!utils.isString(transform)) return q.resolve(transform)
+
+    return transformResolve(transform, {basedir: path.dirname(mod.id)})
+      .fail(transformResolve.bind(null, transform, {basedir: this.basedir}))
+      .then(function(res) {
+        if (!res)
+          throw new Error([
+            'cannot find transform module ', transform,
+            ' while transforming ', mod.id
+          ].join(''))
+        return require(res.id)
+      }.bind(this))
   },
 
   getPackageTransform: function(pkg) {
@@ -269,19 +294,4 @@ function resolveWith(resolve, id, parent) {
       p.resolve({id: filename, package: pkg})
   })
   return p
-}
-
-function loadTransform(mod, transform) {
-  if (!utils.isString(transform)) return q.resolve(transform)
-
-  return transformResolve(transform, {basedir: path.dirname(mod.id)})
-    .fail(transformResolve.bind(null, transform, {basedir: process.cwd()}))
-    .then(function(res) {
-      if (!res)
-        throw new Error([
-          'cannot find transform module ', transform,
-          ' while transforming ', mod.id
-        ].join(''))
-      return require(res.id)
-    })
 }

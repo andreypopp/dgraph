@@ -103,7 +103,7 @@ GraphResolution.prototype = {
       return q.resolve({id: false})
 
     var relativeTo = {
-      packageFilter: this.opts.packageFilter,
+      packageFilter: parent.packageFilter || this.opts.packageFilter,
       extensions: parent.extensions ? parent.extensions : this.extensions,
       modules: this.opts.modules,
       paths: [],

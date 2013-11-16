@@ -2,16 +2,17 @@
 
 `dgraph` is a replacement for `module-deps` which:
 
-  * is almost fully compatible with `module-deps` for the expception of
+  * is almost fully compatible with `module-deps` for the exception of
     different caching mechanism, otherwise it reuses test suite from
     `module-deps`
-  * allows you to extract dependencies and enrich modules via transforms
+  * allows you to extract dependencies and enrich modules via module transforms
+    (in addition to source transform)
 
-## installation
+## Installation
 
     % npm install dgraph
 
-## usage
+## Usage
 
 `dgraph` is fully compatible with `module-deps` so you all configuration options
 and API are the same:
@@ -23,7 +24,15 @@ and API are the same:
       .pipe(JSONStream.stringify())
       .pipe(process.stdout)
 
-### module transforms
+### Global transforms
+
+Transforms specified via command line or function arguments only works for
+modules not in `node_modules/` (this is behaviour of `module-deps` also).
+
+`dgraph` also supports `globalTransform` argument which allows to specify
+transforms for all modules even those in `node_modules/`.
+
+### Module transforms
 
 In addition to source transforms which are supported by `module-deps`, there's
 module transforms which can transform modules themselves.

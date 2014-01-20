@@ -174,10 +174,7 @@ GraphResolution.prototype = {
     if (Buffer.isBuffer(mod.source))
       mod.source = mod.source.toString()
 
-    mod = utils.clone(mod);
-    mod.deps = utils.clone(mod.deps);
-
-    this.output.queue(mod);
+    this.output.queue(utils.clone(mod, true));
     return mod
   },
 

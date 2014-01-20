@@ -1,5 +1,8 @@
 var assert    = require('assert'),
-    bundle    = require('./utils').bundle;
+    utils     = require('./utils'),
+    bundle    = utils.bundle,
+    dgraph    = require('../index'),
+    through    = require('through');
 
 var globalTransform = function(mod, graph) {
   return {source: mod.source.toString().replace(/__A__/g, '"REPLACED!"')};
@@ -18,5 +21,23 @@ describe('dgraph', function() {
         done();
       })
       .fail(done);
+  });
+
+  it('allows downstream to modify dependencies', function(done) {
+    var mains = [].concat('depend_on_mod.js').map(utils.fixture);
+    var count = 0;
+    dgraph(mains, {globalTransform: globalTransform})
+      .pipe(through(function(mod) {
+        /* Dumbly emulate insert-module-globals */
+        mod.deps.utils = require.resolve('./utils');
+        count++;
+        this.queue(mod);
+      }))
+      .pipe(through(function(mod) {
+        if (count >= 2) {
+          done();
+        }
+      }))
+      .on('error', done);
   });
 });

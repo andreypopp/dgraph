@@ -146,7 +146,7 @@ GraphResolution.prototype = {
     if (this.cache[modID])
       mod = this.cache[modID]
 
-    if (mod.source) {
+    if (mod.id && mod.source && mod.deps) {
       var cached = this.cache[modID]
       this.report(cached)
       return this.walkDeps(cached, parent)
